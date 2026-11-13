@@ -1,11 +1,26 @@
 name: ping
+# Mantiene despierto el radar: una llamada cada 5 min durante ~5.5 h y, al terminar, lanza el siguiente turno.
+# El cron es solo la red de seguridad (GitHub lo atrasa o se lo salta); el grupo evita turnos dobles.
 on:
   workflow_dispatch: {}
   schedule:
-    - cron: "*/10 * * * *"
+    - cron: "7,37 * * * *"
+permissions:
+  actions: write
+concurrency:
+  group: ping
+  cancel-in-progress: false
 jobs:
   ping:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 350
     steps:
-      - run: curl -s -o /dev/null -w "%{http_code}\n" --max-time 30 https://eltrotamundospr.com/api/radar
+      - run: |
+          for i in $(seq 1 64); do
+            curl -s -o /dev/null -w "%{http_code} " --max-time 40 https://eltrotamundospr.com/api/radar || true
+            sleep 305
+          done
+      - if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ping.yml -R "${{ github.repository }}" --ref main
